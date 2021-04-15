@@ -8,6 +8,7 @@ import {
   Nft,
   NftItem,
   Token,
+  Transaction,
 } from "../../generated/schema";
 import { ZERO } from "../helpers/number";
 
@@ -56,14 +57,14 @@ export function decreaseAccountBalance(account: Account, token: Token, amount: B
   return balance;
 }
 
-export function saveAccountBalanceSnapshot(balance: AccountBalance, eventId: string, event: ethereum.Event): void {
+export function saveAccountBalanceSnapshot(balance: AccountBalance, eventId: string, event: ethereum.Event, tx: Transaction): void {
   let snapshot = new AccountBalanceSnapshot(balance.id + "-" + event.block.timestamp.toString());
   snapshot.account = balance.account;
   snapshot.token = balance.token;
   snapshot.amount = balance.amount;
 
   snapshot.block = event.block.number;
-  snapshot.transaction = event.transaction.hash;
+  snapshot.transaction = tx.id;
   snapshot.timestamp = event.block.timestamp;
 
   snapshot.event = eventId;
@@ -111,14 +112,14 @@ export function removeTokenFromAccountInventory(account: Account, token: Nft, it
   return inventory;
 }
 
-export function saveAccountInventorySnapshot(balance: AccountInventory, eventId: string, event: ethereum.Event): void {
+export function saveAccountInventorySnapshot(balance: AccountInventory, eventId: string, event: ethereum.Event, tx: Transaction): void {
   let snapshot = new AccountInventorySnapshot(balance.id + "-" + event.block.timestamp.toString());
   snapshot.account = balance.account;
   snapshot.token = balance.token;
   snapshot.tokenIds = balance.tokenIds;
 
   snapshot.block = event.block.number;
-  snapshot.transaction = event.transaction.hash;
+  snapshot.transaction = tx.id;
   snapshot.timestamp = event.block.timestamp;
 
   snapshot.event = eventId;

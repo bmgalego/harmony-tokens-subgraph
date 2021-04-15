@@ -33,7 +33,7 @@ interface AccountAsset {
   modified: BigInt
 
   " Hash of the last transaction that modified the balance "
-  transaction: Bytes
+  transaction: Transaction
 }
 
 #
@@ -61,7 +61,7 @@ type AccountBalance implements AccountAsset @entity {
   modified: BigInt
 
   " Hash of the last transaction that modified the balance "
-  transaction: Bytes
+  transaction: Transaction
 }
 
 type AccountInventory implements AccountAsset @entity {
@@ -88,7 +88,7 @@ type AccountInventory implements AccountAsset @entity {
   modified: BigInt
 
   " Hash of the last transaction that modified the balance "
-  transaction: Bytes
+  transaction: Transaction
 }
 
 #
@@ -118,7 +118,7 @@ type AccountBalanceSnapshot @entity {
   timestamp: BigInt!
 
   " Transaction hash "
-  transaction: Bytes!
+  transaction: Transaction!
 }
 
 type AccountInventorySnapshot @entity {
@@ -144,7 +144,7 @@ type AccountInventorySnapshot @entity {
   timestamp: BigInt!
 
   " Transaction hash "
-  transaction: Bytes!
+  transaction: Transaction!
 }
 
 enum AssetType {
@@ -230,7 +230,7 @@ interface Event {
 
   block: BigInt!
   timestamp: BigInt!
-  transaction: Bytes!
+  transaction: Transaction!
 }
 
 type BurnEvent implements Event @entity {
@@ -258,8 +258,8 @@ type BurnEvent implements Event @entity {
   " Event timestamp "
   timestamp: BigInt!
 
-  " Transaction hash "
-  transaction: Bytes!
+  " Transaction "
+  transaction: Transaction!
 }
 
 type MintEvent implements Event @entity {
@@ -290,8 +290,8 @@ type MintEvent implements Event @entity {
   " Event timestamp "
   timestamp: BigInt!
 
-  " Transaction hash "
-  transaction: Bytes!
+  " Transaction "
+  transaction: Transaction!
 }
 
 type TransferEvent implements Event @entity {
@@ -322,8 +322,8 @@ type TransferEvent implements Event @entity {
   " Event timestamp "
   timestamp: BigInt!
 
-  " Transaction hash "
-  transaction: Bytes!
+  " Transaction "
+  transaction: Transaction!
 }
 
 #
@@ -424,8 +424,8 @@ type NftBurnEvent implements Event @entity {
   " Event timestamp "
   timestamp: BigInt!
 
-  " Transaction hash "
-  transaction: Bytes!
+  " Transaction "
+  transaction: Transaction!
 }
 
 type NftMintEvent implements Event @entity {
@@ -458,8 +458,8 @@ type NftMintEvent implements Event @entity {
   " Event timestamp "
   timestamp: BigInt!
 
-  " Transaction hash "
-  transaction: Bytes!
+  " Transaction "
+  transaction: Transaction!
 }
 
 type NftTransferEvent implements Event @entity {
@@ -492,6 +492,22 @@ type NftTransferEvent implements Event @entity {
   " Event timestamp "
   timestamp: BigInt!
 
-  " Transaction hash "
-  transaction: Bytes!
+  " Transaction "
+  transaction: Transaction!
+}
+
+type Transaction @entity {
+  id: ID!
+  blockHash: Bytes!
+  blockNumber: BigInt!
+  timestamp: BigInt!
+  hash: Bytes!
+  index: BigInt!
+  from: Bytes!
+  to: Bytes
+  value: BigInt!
+  gasUsed: BigInt!
+  gasPrice: BigInt!
+  input: Bytes!
+  events: [Event!]! @derivedFrom(field: "transaction")
 }

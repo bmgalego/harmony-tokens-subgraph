@@ -43,7 +43,7 @@ interface Event {
 
   block: BigInt!
   timestamp: BigInt!
-  transaction: Bytes!
+  transaction: Transaction!
 }
 ```
 
@@ -56,7 +56,7 @@ interface AccountAsset {
   asset: Asset!
   block: BigInt
   modified: BigInt
-  transaction: Bytes
+  transaction: Transaction
 }
 ```
 
@@ -154,7 +154,7 @@ type AccountBalance implements AccountAsset @entity {
   amount: BigDecimal!
   block: BigInt
   modified: BigInt
-  transaction: Bytes
+  transaction: Transaction
 }
 
 type AccountInventory implements AccountAsset @entity {
@@ -166,7 +166,7 @@ type AccountInventory implements AccountAsset @entity {
   items: [NftItem!]! @derivedFrom(field: "ownerInventory")
   block: BigInt
   modified: BigInt
-  transaction: Bytes
+  transaction: Transaction
 }
 ```
 
@@ -181,7 +181,7 @@ type AccountBalanceSnapshot @entity {
   event: Event
   block: BigInt!
   timestamp: BigInt!
-  transaction: Bytes!
+  transaction: Transaction!
 }
 
 type AccountInventorySnapshot @entity {
@@ -192,7 +192,7 @@ type AccountInventorySnapshot @entity {
   event: Event
   block: BigInt!
   timestamp: BigInt!
-  transaction: Bytes!
+  transaction: Transaction!
 }
 ```
 

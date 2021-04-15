@@ -1,5 +1,5 @@
-import { Address, log, BigInt } from "@graphprotocol/graph-ts";
-import { Nft, NftItem, Token } from "../generated/schema";
+import { Address, log, BigInt, ethereum } from "@graphprotocol/graph-ts";
+import { Nft, NftItem, Token, Transaction } from "../generated/schema";
 import { ERC20 } from "../generated/templates/StandardToken/ERC20";
 import { ERC721 } from "../generated/templates/NFT/ERC721";
 import { toDecimal, ZERO } from "./helpers/number";
@@ -95,4 +95,26 @@ export function loadNFTItem(address: Address, tokenId: BigInt): NftItem {
   }
 
   return item as NftItem;
+}
+
+export function loadTransaction(event: ethereum.Event): Transaction {
+  let tx = Transaction.load(event.transaction.hash.toHex());
+
+  if (tx == null) {
+    tx = new Transaction(event.transaction.hash.toHex());
+    tx.blockNumber = event.block.number;
+    tx.blockHash = event.block.hash;
+    tx.hash = event.transaction.hash;
+    tx.index = event.transaction.index;
+    tx.from = event.transaction.from;
+    tx.to = event.transaction.to;
+    tx.value = event.transaction.value;
+    tx.gasUsed = event.transaction.gasUsed;
+    tx.gasPrice = event.transaction.gasPrice;
+    tx.input = event.transaction.input;
+    tx.timestamp = event.block.timestamp;
+    tx.save();
+  }
+
+  return tx as Transaction;
 }
