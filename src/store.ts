@@ -1,5 +1,5 @@
 import { Address, log, BigInt } from "@graphprotocol/graph-ts";
-import { Nft, Token } from "../generated/schema";
+import { Nft, NftItem, Token } from "../generated/schema";
 import { ERC20 } from "../generated/templates/StandardToken/ERC20";
 import { ERC721 } from "../generated/templates/NFT/ERC721";
 import { toDecimal, ZERO } from "./helpers/number";
@@ -15,6 +15,7 @@ export function loadToken(address: Address): Token {
     let decimals = erc20.try_decimals();
 
     token = new Token(address.toHex());
+    token.type = "TOKEN";
     token.address = address;
     token.name = name.reverted ? "unknow" : name.value;
     token.symbol = symbol.reverted ? "unknow" : symbol.value;
@@ -25,22 +26,17 @@ export function loadToken(address: Address): Token {
     token.mintEventCount = ZERO;
     token.transferEventCount = ZERO;
 
-    token.totalSupply = initialSupply.reverted
-      ? ZERO.toBigDecimal()
-      : toDecimal(initialSupply.value, token.decimals);
+    token.totalSupply = initialSupply.reverted ? ZERO.toBigDecimal() : toDecimal(initialSupply.value, token.decimals);
     token.totalBurned = ZERO.toBigDecimal();
     token.totalMinted = ZERO.toBigDecimal();
     token.totalTransferred = ZERO.toBigDecimal();
 
-    log.debug(
-      "Adding token to registry, name: {}, symbol: {}, address: {}, decimals: {}",
-      [
-        token.name,
-        token.symbol,
-        token.id,
-        BigInt.fromI32(decimals.value).toString(),
-      ]
-    );
+    log.debug("Adding token to registry, name: {}, symbol: {}, address: {}, decimals: {}", [
+      token.name,
+      token.symbol,
+      token.id,
+      BigInt.fromI32(decimals.value).toString(),
+    ]);
 
     token.save();
   }
@@ -57,6 +53,7 @@ export function loadNFT(address: Address): Nft {
     let symbol = erc721.try_symbol();
 
     token = new Nft(address.toHex());
+    token.type = "NFT";
     token.address = address;
     token.name = name.reverted ? "unknow" : name.value;
     token.symbol = symbol.reverted ? "unknow" : symbol.value;
@@ -72,14 +69,30 @@ export function loadNFT(address: Address): Nft {
 
     token.tokenIds = [];
 
-    log.debug("Adding nft to registry, name: {}, symbol: {}, address: {}", [
-      token.name,
-      token.symbol,
-      token.id,
-    ]);
+    log.debug("Adding nft to registry, name: {}, symbol: {}, address: {}", [token.name, token.symbol, token.id]);
 
     token.save();
   }
 
   return token as Nft;
+}
+
+export function loadNFTItem(address: Address, tokenId: BigInt): NftItem {
+  let item = NftItem.load(address.toHex() + "-" + tokenId.toString());
+
+  if (item == null) {
+    let erc721 = ERC721.bind(address);
+    let uri = erc721.try_tokenURI(tokenId);
+
+    item = new NftItem(address.toHex() + "-" + tokenId.toString());
+    item.token = address.toHex();
+    item.tokenId = tokenId;
+    item.tokenUri = uri.reverted ? "" : uri.value;
+    item.eventCount = ZERO;
+    item.transferEventCount = ZERO;
+
+    item.save();
+  }
+
+  return item as NftItem;
 }

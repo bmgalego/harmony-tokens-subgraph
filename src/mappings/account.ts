@@ -4,7 +4,9 @@ import {
   AccountBalance,
   AccountBalanceSnapshot,
   AccountInventory,
+  AccountInventorySnapshot,
   Nft,
+  NftItem,
   Token,
 } from "../../generated/schema";
 import { ZERO } from "../helpers/number";
@@ -23,10 +25,7 @@ export function getOrCreateAccount(accountAddress: Bytes): Account {
   return newAccount;
 }
 
-function getOrCreateAccountBalance(
-  account: Account,
-  token: Token
-): AccountBalance {
+function getOrCreateAccountBalance(account: Account, token: Token): AccountBalance {
   let balanceId = account.id + "-" + token.id;
   let previousBalance = AccountBalance.load(balanceId);
 
@@ -36,42 +35,29 @@ function getOrCreateAccountBalance(
 
   let newBalance = new AccountBalance(balanceId);
   newBalance.account = account.id;
+  newBalance.asset = token.id;
   newBalance.token = token.id;
   newBalance.amount = ZERO.toBigDecimal();
 
   return newBalance;
 }
 
-export function increaseAccountBalance(
-  account: Account,
-  token: Token,
-  amount: BigDecimal
-): AccountBalance {
+export function increaseAccountBalance(account: Account, token: Token, amount: BigDecimal): AccountBalance {
   let balance = getOrCreateAccountBalance(account, token);
   balance.amount = balance.amount.plus(amount);
 
   return balance;
 }
 
-export function decreaseAccountBalance(
-  account: Account,
-  token: Token,
-  amount: BigDecimal
-): AccountBalance {
+export function decreaseAccountBalance(account: Account, token: Token, amount: BigDecimal): AccountBalance {
   let balance = getOrCreateAccountBalance(account, token);
   balance.amount = balance.amount.minus(amount);
 
   return balance;
 }
 
-export function saveAccountBalanceSnapshot(
-  balance: AccountBalance,
-  eventId: string,
-  event: ethereum.Event
-): void {
-  let snapshot = new AccountBalanceSnapshot(
-    balance.id + "-" + event.block.timestamp.toString()
-  );
+export function saveAccountBalanceSnapshot(balance: AccountBalance, eventId: string, event: ethereum.Event): void {
+  let snapshot = new AccountBalanceSnapshot(balance.id + "-" + event.block.timestamp.toString());
   snapshot.account = balance.account;
   snapshot.token = balance.token;
   snapshot.amount = balance.amount;
@@ -93,10 +79,7 @@ function createTokenFilter(tokenId: BigInt): TokenFilter {
   };
 }
 
-function getOrCreateAccountInventory(
-  account: Account,
-  token: Nft
-): AccountInventory {
+export function getOrCreateAccountInventory(account: Account, token: Nft): AccountInventory {
   let balanceId = account.id + "-" + token.id;
   let previousInventory = AccountInventory.load(balanceId);
 
@@ -106,32 +89,39 @@ function getOrCreateAccountInventory(
 
   let newInventory = new AccountInventory(balanceId);
   newInventory.account = account.id;
+  newInventory.asset = token.id;
   newInventory.token = token.id;
   newInventory.tokenIds = [];
 
   return newInventory;
 }
 
-export function addTokenToAccountInventory(
-  account: Account,
-  token: Nft,
-  tokenId: BigInt
-): AccountInventory {
+export function addTokenToAccountInventory(account: Account, token: Nft, item: NftItem): AccountInventory {
   let inventory = getOrCreateAccountInventory(account, token);
   let tokenIds = inventory.tokenIds;
-  tokenIds.push(tokenId);
+  tokenIds.push(item.tokenId);
   inventory.tokenIds = tokenIds;
+  return inventory;
+}
+
+export function removeTokenFromAccountInventory(account: Account, token: Nft, item: NftItem): AccountInventory {
+  let inventory = getOrCreateAccountInventory(account, token);
+  inventory.tokenIds = inventory.tokenIds.filter(createTokenFilter(item.tokenId));
 
   return inventory;
 }
 
-export function removeTokenFromAccountInventory(
-  account: Account,
-  token: Nft,
-  tokenId: BigInt
-): AccountInventory {
-  let inventory = getOrCreateAccountInventory(account, token);
-  inventory.tokenIds = inventory.tokenIds.filter(createTokenFilter(tokenId));
+export function saveAccountInventorySnapshot(balance: AccountInventory, eventId: string, event: ethereum.Event): void {
+  let snapshot = new AccountInventorySnapshot(balance.id + "-" + event.block.timestamp.toString());
+  snapshot.account = balance.account;
+  snapshot.token = balance.token;
+  snapshot.tokenIds = balance.tokenIds;
 
-  return inventory;
+  snapshot.block = event.block.number;
+  snapshot.transaction = event.transaction.hash;
+  snapshot.timestamp = event.block.timestamp;
+
+  snapshot.event = eventId;
+
+  snapshot.save();
 }

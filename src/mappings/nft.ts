@@ -1,18 +1,15 @@
 import { Bytes, BigInt } from "@graphprotocol/graph-ts";
 import { Transfer } from "../../generated/templates/NFT/ERC721";
-import {
-  Nft,
-  NftMintEvent,
-  NftBurnEvent,
-  NftTransferEvent,
-} from "../../generated/schema";
+import { Nft, NftMintEvent, NftBurnEvent, NftTransferEvent, NftItem } from "../../generated/schema";
 import { ONE } from "../helpers/number";
 import {
   addTokenToAccountInventory,
   getOrCreateAccount,
+  getOrCreateAccountInventory,
   removeTokenFromAccountInventory,
+  saveAccountInventorySnapshot,
 } from "./account";
-import { loadNFT } from "../store";
+import { loadNFT, loadNFTItem } from "../store";
 
 const GENESIS_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -22,34 +19,28 @@ export function handleTransfer(event: Transfer): void {
   if (token != null) {
     let tokenId = event.params.tokenId;
 
+    let item = NftItem.load(event.address.toHex() + "-" + tokenId.toString());
+
     let isBurn = event.params.to.toHex() == GENESIS_ADDRESS;
-    let isMint = event.params.from.toHex() == GENESIS_ADDRESS;
+    let isMint = event.params.from.toHex() == GENESIS_ADDRESS || item == null;
+
+    item = loadNFTItem(event.address, tokenId) as NftItem;
+
     let isTransfer = !isBurn && !isMint;
 
     // Update token event logs
     let eventEntityId: string;
 
     if (isBurn) {
-      let eventEntity = handleBurnEvent(
-        token,
-        tokenId,
-        event.params.from,
-        event
-      );
+      let eventEntity = handleBurnEvent(token, item as NftItem, event.params.from, event);
 
       eventEntityId = eventEntity.id;
     } else if (isMint) {
-      let eventEntity = handleMintEvent(token, tokenId, event.params.to, event);
+      let eventEntity = handleMintEvent(token, item as NftItem, event.params.to, event);
 
       eventEntityId = eventEntity.id;
     } else if (isTransfer) {
-      let eventEntity = handleTransferEvent(
-        token,
-        tokenId,
-        event.params.from,
-        event.params.to,
-        event
-      );
+      let eventEntity = handleTransferEvent(token, item as NftItem, event.params.from, event.params.to, event);
 
       eventEntityId = eventEntity.id;
     }
@@ -58,11 +49,7 @@ export function handleTransfer(event: Transfer): void {
     if (isTransfer || isBurn) {
       let sourceAccount = getOrCreateAccount(event.params.from);
 
-      let accountInventory = removeTokenFromAccountInventory(
-        sourceAccount,
-        token as Nft,
-        tokenId
-      );
+      let accountInventory = removeTokenFromAccountInventory(sourceAccount, token as Nft, item as NftItem);
 
       accountInventory.block = event.block.number;
       accountInventory.modified = event.block.timestamp;
@@ -70,22 +57,20 @@ export function handleTransfer(event: Transfer): void {
 
       sourceAccount.save();
       accountInventory.save();
+      saveAccountInventorySnapshot(accountInventory, eventEntityId, event);
     }
 
     if (isTransfer || isMint) {
       let destinationAccount = getOrCreateAccount(event.params.to);
 
-      let accountBalance = addTokenToAccountInventory(
-        destinationAccount,
-        token as Nft,
-        tokenId
-      );
-      accountBalance.block = event.block.number;
-      accountBalance.modified = event.block.timestamp;
-      accountBalance.transaction = event.transaction.hash;
+      let accountInventory = addTokenToAccountInventory(destinationAccount, token as Nft, item as NftItem);
+      accountInventory.block = event.block.number;
+      accountInventory.modified = event.block.timestamp;
+      accountInventory.transaction = event.transaction.hash;
 
       destinationAccount.save();
-      accountBalance.save();
+      accountInventory.save();
+      saveAccountInventorySnapshot(accountInventory, eventEntityId, event);
     }
   }
 }
@@ -98,17 +83,13 @@ function createTokenFilter(tokenId: BigInt): TokenFilter {
   };
 }
 
-function handleBurnEvent(
-  token: Nft | null,
-  tokenId: BigInt,
-  burner: Bytes,
-  event: Transfer
-): NftBurnEvent {
-  let burnEvent = new NftBurnEvent(
-    event.transaction.hash.toHex() + "-" + event.logIndex.toString()
-  );
+function handleBurnEvent(token: Nft | null, item: NftItem, burner: Bytes, event: Transfer): NftBurnEvent {
+  let burnEvent = new NftBurnEvent(event.transaction.hash.toHex() + "-" + event.logIndex.toString());
+  burnEvent.type = "BURN";
+  burnEvent.asset = event.address.toHex();
   burnEvent.token = event.address.toHex();
-  burnEvent.tokenId = tokenId;
+  burnEvent.item = item.id;
+  burnEvent.tokenId = item.tokenId;
   burnEvent.sender = event.transaction.from;
   burnEvent.burner = burner;
 
@@ -118,34 +99,34 @@ function handleBurnEvent(
 
   burnEvent.save();
 
-  // Track total supply/burned
   if (token != null) {
     token.eventCount = token.eventCount.plus(ONE);
     token.burnEventCount = token.burnEventCount.plus(ONE);
     token.totalSupply = token.totalSupply.minus(ONE);
     token.totalBurned = token.totalBurned.plus(ONE);
 
-    token.tokenIds = token.tokenIds.filter(
-      createTokenFilter(event.params.tokenId)
-    );
+    token.tokenIds = token.tokenIds.filter(createTokenFilter(event.params.tokenId));
 
     token.save();
+
+    item.eventCount = item.eventCount.plus(ONE);
+    item.owner = null;
+    item.ownerInventory = null;
+    item.burner = burner;
+    item.burn = burnEvent.id;
+    item.save();
   }
 
   return burnEvent;
 }
 
-function handleMintEvent(
-  token: Nft | null,
-  tokenId: BigInt,
-  destination: Bytes,
-  event: Transfer
-): NftMintEvent {
-  let mintEvent = new NftMintEvent(
-    event.transaction.hash.toHex() + "-" + event.logIndex.toString()
-  );
+function handleMintEvent(token: Nft | null, item: NftItem, destination: Bytes, event: Transfer): NftMintEvent {
+  let mintEvent = new NftMintEvent(event.transaction.hash.toHex() + "-" + event.logIndex.toString());
+  mintEvent.type = "MINT";
+  mintEvent.asset = event.address.toHex();
   mintEvent.token = event.address.toHex();
-  mintEvent.tokenId = tokenId;
+  mintEvent.item = item.id;
+  mintEvent.tokenId = item.tokenId;
   mintEvent.sender = event.transaction.from;
   mintEvent.destination = destination;
   mintEvent.minter = event.transaction.from;
@@ -156,7 +137,6 @@ function handleMintEvent(
 
   mintEvent.save();
 
-  // Track total token supply/minted
   if (token != null) {
     token.eventCount = token.eventCount.plus(ONE);
     token.mintEventCount = token.mintEventCount.plus(ONE);
@@ -164,26 +144,31 @@ function handleMintEvent(
     token.totalMinted = token.totalMinted.plus(ONE);
 
     let tokenIds = token.tokenIds;
-    tokenIds.push(tokenId);
+    tokenIds.push(item.tokenId);
     token.tokenIds = tokenIds;
     token.save();
+
+    let destinationAccount = getOrCreateAccount(destination);
+    let destinationAccountInventory = getOrCreateAccountInventory(destinationAccount, token as Nft);
+
+    item.eventCount = item.eventCount.plus(ONE);
+    item.minter = event.transaction.from;
+    item.mint = mintEvent.id;
+    item.owner = destinationAccount.id;
+    item.ownerInventory = destinationAccountInventory.id;
+    item.save();
   }
 
   return mintEvent;
 }
 
-function handleTransferEvent(
-  token: Nft | null,
-  tokenId: BigInt,
-  source: Bytes,
-  destination: Bytes,
-  event: Transfer
-): NftTransferEvent {
-  let transferEvent = new NftTransferEvent(
-    event.transaction.hash.toHex() + "-" + event.logIndex.toString()
-  );
+function handleTransferEvent(token: Nft | null, item: NftItem, source: Bytes, destination: Bytes, event: Transfer): NftTransferEvent {
+  let transferEvent = new NftTransferEvent(event.transaction.hash.toHex() + "-" + event.logIndex.toString());
+  transferEvent.type = "TRANSFER";
+  transferEvent.asset = event.address.toHex();
   transferEvent.token = event.address.toHex();
-  transferEvent.tokenId = tokenId;
+  transferEvent.item = item.id;
+  transferEvent.tokenId = item.tokenId;
   transferEvent.sender = source;
   transferEvent.source = source;
   transferEvent.destination = destination;
@@ -194,12 +179,20 @@ function handleTransferEvent(
 
   transferEvent.save();
 
-  // Track total token transferred
   if (token != null) {
     token.eventCount = token.eventCount.plus(ONE);
     token.transferEventCount = token.transferEventCount.plus(ONE);
 
     token.save();
+
+    let destinationAccount = getOrCreateAccount(destination);
+    let destinationAccountInventory = getOrCreateAccountInventory(destinationAccount, token as Nft);
+
+    item.eventCount = item.eventCount.plus(ONE);
+    item.transferEventCount = token.transferEventCount.plus(ONE);
+    item.owner = destinationAccount.id;
+    item.ownerInventory = destinationAccountInventory.id;
+    item.save();
   }
 
   return transferEvent;

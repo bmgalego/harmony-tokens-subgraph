@@ -169,7 +169,9 @@ function handleBurnEvent(
   let burnEvent = new BurnEvent(
     event.transaction.hash.toHex() + "-" + event.logIndex.toString()
   );
+  burnEvent.type = "BURN";
   burnEvent.token = event.address.toHex();
+  burnEvent.asset = event.address.toHex();
   burnEvent.amount = amount;
   burnEvent.sender = event.transaction.from;
   burnEvent.burner = burner;
@@ -201,7 +203,9 @@ function handleMintEvent(
   let mintEvent = new MintEvent(
     event.transaction.hash.toHex() + "-" + event.logIndex.toString()
   );
+  mintEvent.type = "MINT";
   mintEvent.token = event.address.toHex();
+  mintEvent.asset = event.address.toHex();
   mintEvent.amount = amount;
   mintEvent.sender = event.transaction.from;
   mintEvent.destination = destination;
@@ -236,7 +240,9 @@ function handleTransferEvent(
   let transferEvent = new TransferEvent(
     event.transaction.hash.toHex() + "-" + event.logIndex.toString()
   );
+  transferEvent.type = "TRANSFER";
   transferEvent.token = event.address.toHex();
+  transferEvent.asset = event.address.toHex();
   transferEvent.amount = amount;
   transferEvent.sender = source;
   transferEvent.source = source;

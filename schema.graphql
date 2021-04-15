@@ -8,21 +8,45 @@ type Account @entity {
   " Account address "
   address: Bytes!
 
+  assets: [AccountAsset!]! @derivedFrom(field: "account")
+
   " Token balances that this account holds "
   balances: [AccountBalance!]! @derivedFrom(field: "account")
+  balancesSnapshots: [AccountBalanceSnapshot!]! @derivedFrom(field: "account")
 
   inventory: [AccountInventory!]! @derivedFrom(field: "account")
+  inventorySnapshots: [AccountInventorySnapshot!]! @derivedFrom(field: "account")
+}
+
+interface AccountAsset {
+  " Equals to: <accountAddress>-<tokenAddress>"
+  id: ID!
+  " Account address "
+  account: Account!
+
+  asset: Asset!
+
+  " Block number in which the balance was last modified "
+  block: BigInt
+
+  " Last modified timestamp in seconds "
+  modified: BigInt
+
+  " Hash of the last transaction that modified the balance "
+  transaction: Bytes
 }
 
 #
 # Current token balance of a particular Ethereum account
 #
-type AccountBalance @entity {
+type AccountBalance implements AccountAsset @entity {
   " Equals to: <accountAddress>-<tokenAddress>"
   id: ID!
 
   " Account address "
   account: Account!
+
+  asset: Asset!
 
   " Token address "
   token: Token!
@@ -40,18 +64,22 @@ type AccountBalance @entity {
   transaction: Bytes
 }
 
-type AccountInventory @entity {
+type AccountInventory implements AccountAsset @entity {
   " Equals to: <accountAddress>-<tokenAddress>"
   id: ID!
 
   " Account address "
   account: Account!
 
+  asset: Asset!
+
   " Token address "
   token: Nft!
 
   " Current account balance "
   tokenIds: [BigInt!]!
+
+  items: [NftItem!]! @derivedFrom(field: "ownerInventory")
 
   " Block number in which the balance was last modified "
   block: BigInt
@@ -81,7 +109,7 @@ type AccountBalanceSnapshot @entity {
   amount: BigDecimal!
 
   # TODO: Add description and check if could be non-optional
-  event: TokenEvent
+  event: Event
 
   " Block number "
   block: BigInt!
@@ -93,11 +121,56 @@ type AccountBalanceSnapshot @entity {
   transaction: Bytes!
 }
 
+type AccountInventorySnapshot @entity {
+  " Equals to: <accountAddress>-<tokenAddress>-<timestamp>"
+  id: ID!
+
+  " Account address "
+  account: Account!
+
+  " Token addess "
+  token: Nft!
+
+  " Account balance "
+  tokenIds: [BigInt!]!
+
+  # TODO: Add description and check if could be non-optional
+  event: Event
+
+  " Block number "
+  block: BigInt!
+
+  " Timestamp in seconds "
+  timestamp: BigInt!
+
+  " Transaction hash "
+  transaction: Bytes!
+}
+
+enum AssetType {
+  TOKEN
+  NFT
+}
+
+interface Asset {
+  id: ID!
+  type: AssetType!
+  symbol: String!
+  name: String!
+
+  address: Bytes!
+
+  events: [Event!]! @derivedFrom(field: "asset")
+  eventCount: BigInt!
+}
+
 #
 # Provides information about an ERC20 token
 #
-type Token @entity {
+type Token implements Asset @entity {
   id: ID!
+
+  type: AssetType!
 
   " Token address "
   address: Bytes!
@@ -136,25 +209,36 @@ type Token @entity {
   totalTransferred: BigDecimal!
 
   " List of token events "
-  events: [TokenEvent!]! @derivedFrom(field: "token")
+  events: [Event!]! @derivedFrom(field: "asset")
+  mints: [BurnEvent!]! @derivedFrom(field: "token")
+  burns: [MintEvent!]! @derivedFrom(field: "token")
+  transfers: [TransferEvent!]! @derivedFrom(field: "token")
 }
 
-#
-# Token events
-#
-interface TokenEvent {
+enum EventType {
+  TRANSFER
+  BURN
+  MINT
+}
+
+interface Event {
   id: ID!
-  token: Token!
-  amount: BigDecimal!
-  sender: Bytes!
+
+  type: EventType!
+
+  asset: Asset
 
   block: BigInt!
   timestamp: BigInt!
   transaction: Bytes!
 }
 
-type BurnEvent implements TokenEvent @entity {
+type BurnEvent implements Event @entity {
   id: ID!
+
+  type: EventType!
+
+  asset: Asset
 
   " Token address "
   token: Token!
@@ -178,8 +262,12 @@ type BurnEvent implements TokenEvent @entity {
   transaction: Bytes!
 }
 
-type MintEvent implements TokenEvent @entity {
+type MintEvent implements Event @entity {
   id: ID!
+
+  type: EventType!
+
+  asset: Asset
 
   " Token address "
   token: Token!
@@ -206,8 +294,12 @@ type MintEvent implements TokenEvent @entity {
   transaction: Bytes!
 }
 
-type TransferEvent implements TokenEvent @entity {
+type TransferEvent implements Event @entity {
   id: ID!
+
+  type: EventType!
+
+  asset: Asset
 
   " Token address "
   token: Token!
@@ -237,8 +329,10 @@ type TransferEvent implements TokenEvent @entity {
 #
 # Provides information about an ERC721 token
 #
-type Nft @entity {
+type Nft implements Asset @entity {
   id: ID!
+
+  type: AssetType!
 
   " Token address "
   address: Bytes!
@@ -251,9 +345,6 @@ type Nft @entity {
 
   " Token description "
   description: String
-
-  " Image URL "
-  imageUrl: String
 
   # TODO: Number of token holders
   # holderCount: BigInt!
@@ -281,32 +372,45 @@ type Nft @entity {
 
   tokenIds: [BigInt!]!
 
+  items: [NftItem!]! @derivedFrom(field: "token")
+
   " List of token events "
-  events: [NftEvent!]! @derivedFrom(field: "token")
+  events: [Event!]! @derivedFrom(field: "asset")
+  mints: [NftBurnEvent!]! @derivedFrom(field: "token")
+  burns: [NftMintEvent!]! @derivedFrom(field: "token")
+  transfers: [NftTransferEvent!]! @derivedFrom(field: "token")
 }
 
-#
-# Nft events
-#
-interface NftEvent {
+type NftItem @entity {
   id: ID!
-  token: Nft!
+  tokenUri: String!
   tokenId: BigInt!
-  sender: Bytes!
-
-  block: BigInt!
-  timestamp: BigInt!
-  transaction: Bytes!
+  token: Nft!
+  owner: Account
+  ownerInventory: AccountInventory
+  minter: Bytes
+  burner: Bytes
+  mint: NftMintEvent
+  burn: NftBurnEvent
+  eventCount: BigInt!
+  transferEventCount: BigInt!
+  transfers: [NftTransferEvent!]! @derivedFrom(field: "item")
 }
 
-type NftBurnEvent implements NftEvent @entity {
+type NftBurnEvent implements Event @entity {
   id: ID!
+
+  type: EventType!
+
+  asset: Asset
 
   " Token address "
   token: Nft!
 
   " TokenId burned "
   tokenId: BigInt!
+
+  item: NftItem!
 
   " Transaction sender address "
   sender: Bytes!
@@ -324,14 +428,20 @@ type NftBurnEvent implements NftEvent @entity {
   transaction: Bytes!
 }
 
-type NftMintEvent implements NftEvent @entity {
+type NftMintEvent implements Event @entity {
   id: ID!
+
+  type: EventType!
+
+  asset: Asset
 
   " Token address "
   token: Nft!
 
   " TokenId minted "
   tokenId: BigInt!
+
+  item: NftItem!
 
   " Transaction sender address "
   sender: Bytes!
@@ -352,14 +462,20 @@ type NftMintEvent implements NftEvent @entity {
   transaction: Bytes!
 }
 
-type NftTransferEvent implements NftEvent @entity {
+type NftTransferEvent implements Event @entity {
   id: ID!
+
+  type: EventType!
+
+  asset: Asset
 
   " Token address "
   token: Nft!
 
   " TokenId transferred "
   tokenId: BigInt!
+
+  item: NftItem!
 
   " Transaction sender address "
   sender: Bytes!
