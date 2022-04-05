@@ -15,7 +15,8 @@ type Account @entity {
   balancesSnapshots: [AccountBalanceSnapshot!]! @derivedFrom(field: "account")
 
   inventory: [AccountInventory!]! @derivedFrom(field: "account")
-  inventorySnapshots: [AccountInventorySnapshot!]! @derivedFrom(field: "account")
+  inventorySnapshots: [AccountInventorySnapshot!]!
+    @derivedFrom(field: "account")
 }
 
 interface AccountAsset {
@@ -175,6 +176,9 @@ type Token implements Asset @entity {
   " Token address "
   address: Bytes!
 
+  holders: [AccountBalance!]! @derivedFrom(field: "token")
+
+
   " Number of decimals the token uses "
   decimals: Int!
 
@@ -213,6 +217,7 @@ type Token implements Asset @entity {
   mints: [BurnEvent!]! @derivedFrom(field: "token")
   burns: [MintEvent!]! @derivedFrom(field: "token")
   transfers: [TransferEvent!]! @derivedFrom(field: "token")
+
 }
 
 enum EventType {
@@ -342,9 +347,6 @@ type Nft implements Asset @entity {
 
   " Symbol of the token "
   symbol: String!
-
-  " Token description "
-  description: String
 
   # TODO: Number of token holders
   # holderCount: BigInt!
