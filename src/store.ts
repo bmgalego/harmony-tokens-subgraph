@@ -31,12 +31,15 @@ export function loadToken(address: Address): Token {
     token.totalMinted = ZERO.toBigDecimal();
     token.totalTransferred = ZERO.toBigDecimal();
 
-    log.debug("Adding token to registry, name: {}, symbol: {}, address: {}, decimals: {}", [
+    log.debug(
+      "Adding token to registry, name: {}, symbol: {}, address: {}, decimals: {}",
+      [
       token.name,
       token.symbol,
       token.id,
       BigInt.fromI32(decimals.value).toString(),
-    ]);
+      ]
+    );
 
     token.save();
   }
@@ -69,7 +72,11 @@ export function loadNFT(address: Address): Nft {
 
     token.tokenIds = [];
 
-    log.debug("Adding nft to registry, name: {}, symbol: {}, address: {}", [token.name, token.symbol, token.id]);
+    log.debug("Adding nft to registry, name: {}, symbol: {}, address: {}", [
+      token.name,
+      token.symbol,
+      token.id,
+    ]);
 
     token.save();
   }
@@ -111,7 +118,6 @@ export function loadTransaction(event: ethereum.Event): Transaction {
     tx.value = event.transaction.value;
     tx.gasUsed = event.transaction.gasUsed;
     tx.gasPrice = event.transaction.gasPrice;
-    tx.input = event.transaction.input;
     tx.timestamp = event.block.timestamp;
     tx.save();
   }

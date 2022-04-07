@@ -510,6 +510,5 @@ type Transaction @entity {
   value: BigInt!
   gasUsed: BigInt!
   gasPrice: BigInt!
-  input: Bytes!
   events: [Event!]! @derivedFrom(field: "transaction")
 }
